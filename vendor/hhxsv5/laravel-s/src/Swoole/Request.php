@@ -3,18 +3,20 @@
 namespace Hhxsv5\LaravelS\Swoole;
 
 use Illuminate\Http\Request as IlluminateRequest;
+use Swoole\Http\Request as SwooleRequest;
 use Symfony\Component\HttpFoundation\ParameterBag;
 
 class Request
 {
     protected $swooleRequest;
 
-    public function __construct(\swoole_http_request $request)
+    public function __construct(SwooleRequest $request)
     {
         $this->swooleRequest = $request;
     }
 
     /**
+     * Convert SwooleRequest to IlluminateRequest
      * @param array $rawServer
      * @param array $rawEnv
      * @return IlluminateRequest
@@ -27,6 +29,7 @@ class Request
         $server = isset($this->swooleRequest->server) ? $this->swooleRequest->server : [];
         $headers = isset($this->swooleRequest->header) ? $this->swooleRequest->header : [];
         $__FILES = isset($this->swooleRequest->files) ? $this->swooleRequest->files : [];
+        $__CONTENT = empty($__FILES) ? $this->swooleRequest->rawContent() : ''; // Cannot call rawContent() to avoid double the file memory when uploading a file.
         $_REQUEST = [];
         $_SESSION = [];
 
@@ -41,7 +44,7 @@ class Request
         ];
 
         $_ENV = $rawEnv;
-        $__SERVER = $rawServer;
+        $_SERVER = $rawServer;
         foreach ($headers as $key => $value) {
             // Fix client && server's info
             if (isset($headerServerMapping[$key])) {
@@ -52,30 +55,30 @@ class Request
             }
         }
         $server = array_change_key_case($server, CASE_UPPER);
-        $__SERVER = array_merge($__SERVER, $server);
-        if (isset($__SERVER['REQUEST_SCHEME']) && $__SERVER['REQUEST_SCHEME'] === 'https') {
-            $__SERVER['HTTPS'] = 'on';
+        $_SERVER = array_merge($_SERVER, $server);
+        if (isset($_SERVER['REQUEST_SCHEME']) && $_SERVER['REQUEST_SCHEME'] === 'https') {
+            $_SERVER['HTTPS'] = 'on';
         }
 
         // Fix REQUEST_URI with QUERY_STRING
-        if (strpos($__SERVER['REQUEST_URI'], '?') === false
-            && isset($__SERVER['QUERY_STRING'])
-            && strlen($__SERVER['QUERY_STRING']) > 0
+        if (strpos($_SERVER['REQUEST_URI'], '?') === false
+            && isset($_SERVER['QUERY_STRING'])
+            && $_SERVER['QUERY_STRING'] !== ''
         ) {
-            $__SERVER['REQUEST_URI'] .= '?' . $__SERVER['QUERY_STRING'];
+            $_SERVER['REQUEST_URI'] .= '?' . $_SERVER['QUERY_STRING'];
         }
 
         // Fix argv & argc
-        if (!isset($__SERVER['argv'])) {
-            $__SERVER['argv'] = isset($GLOBALS['argv']) ? $GLOBALS['argv'] : [];
-            $__SERVER['argc'] = isset($GLOBALS['argc']) ? $GLOBALS['argc'] : 0;
+        if (!isset($_SERVER['argv'])) {
+            $_SERVER['argv'] = isset($GLOBALS['argv']) ? $GLOBALS['argv'] : [];
+            $_SERVER['argc'] = isset($GLOBALS['argc']) ? $GLOBALS['argc'] : 0;
         }
 
         // Initialize laravel request
         IlluminateRequest::enableHttpMethodParameterOverride();
-        $request = IlluminateRequest::createFromBase(new \Symfony\Component\HttpFoundation\Request($__GET, $__POST, [], $__COOKIE, $__FILES, $__SERVER, $this->swooleRequest->rawContent()));
+        $request = IlluminateRequest::createFromBase(new \Symfony\Component\HttpFoundation\Request($__GET, $__POST, [], $__COOKIE, $__FILES, $_SERVER, $__CONTENT));
 
-        if (0 === strpos($request->headers->get('CONTENT_TYPE'), 'application/x-www-form-urlencoded')
+        if (0 === strpos($request->headers->get('CONTENT_TYPE', ''), 'application/x-www-form-urlencoded')
             && in_array(strtoupper($request->server->get('REQUEST_METHOD', 'GET')), ['PUT', 'DELETE', 'PATCH'])
         ) {
             parse_str($request->getContent(), $data);
@@ -84,5 +87,4 @@ class Request
 
         return $request;
     }
-
 }

@@ -6,7 +6,6 @@ use Illuminate\Support\ServiceProvider;
 
 class LaravelSServiceProvider extends ServiceProvider
 {
-
     public function boot()
     {
         $this->publishes([
@@ -20,7 +19,9 @@ class LaravelSServiceProvider extends ServiceProvider
             __DIR__ . '/../../config/laravels.php', 'laravels'
         );
 
-        $this->commands(LaravelSCommand::class);
+        $this->commands([
+            LaravelSCommand::class,
+            ListPropertiesCommand::class,
+        ]);
     }
-
 }

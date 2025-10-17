@@ -2,20 +2,16 @@
 
 namespace Hhxsv5\LaravelS\Illuminate;
 
+use Hhxsv5\LaravelS\Console\Portal;
 use Hhxsv5\LaravelS\Swoole\Timer\CronJob;
 
 class LaravelScheduleJob extends CronJob
 {
     protected $artisan;
 
-    public function __construct()
-    {
-        $this->artisan = app('Illuminate\Contracts\Console\Kernel');
-    }
-
     public function interval()
     {
-        return 60 * 1000;// Run every 1 minute
+        return 60 * 1000; // Run every 1 minute
     }
 
     public function isImmediate()
@@ -25,6 +21,6 @@ class LaravelScheduleJob extends CronJob
 
     public function run()
     {
-        $this->artisan->call('schedule:run');
+        Portal::runArtisanCommand(base_path(), 'schedule:run >> /dev/null 2>&1 &');
     }
 }

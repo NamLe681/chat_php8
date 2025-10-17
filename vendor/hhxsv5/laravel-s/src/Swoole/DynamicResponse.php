@@ -2,10 +2,10 @@
 
 namespace Hhxsv5\LaravelS\Swoole;
 
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
 class DynamicResponse extends Response
 {
-    const CHUNK_LIMIT = 2097152; // 2M
-
     /**
      * @throws \Exception
      */
@@ -14,13 +14,19 @@ class DynamicResponse extends Response
         if (extension_loaded('zlib')) {
             $this->swooleResponse->gzip(2);
         } else {
-            throw new \Exception('Http GZIP requires library "zlib", use "php --ri zlib" to check.');
+            throw new \RuntimeException('Http GZIP requires library "zlib", use "php --ri zlib" to check.');
         }
     }
 
     public function sendContent()
     {
-        $content = $this->laravelResponse->getContent();
+        if ($this->laravelResponse instanceof StreamedResponse) {
+            ob_start();
+            $this->laravelResponse = $this->laravelResponse->sendContent();
+            $content = ob_get_clean();
+        } else {
+            $content = $this->laravelResponse->getContent();
+        }
 
         $len = strlen($content);
         if ($len === 0) {
@@ -28,9 +34,9 @@ class DynamicResponse extends Response
             return;
         }
 
-        if ($len > self::CHUNK_LIMIT) {
-            for ($i = 0, $limit = 1024 * 1024; $i < $len; $i += $limit) {
-                $chunk = substr($content, $i, $limit);
+        if ($len > $this->chunkLimit) {
+            for ($offset = 0, $limit = (int)(0.6 * $this->chunkLimit); $offset < $len; $offset += $limit) {
+                $chunk = substr($content, $offset, $limit);
                 $this->swooleResponse->write($chunk);
             }
             $this->swooleResponse->end();

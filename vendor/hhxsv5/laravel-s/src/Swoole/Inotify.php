@@ -2,6 +2,9 @@
 
 namespace Hhxsv5\LaravelS\Swoole;
 
+use Swoole\Event;
+use Swoole\Timer;
+
 class Inotify
 {
     private $fd;
@@ -75,6 +78,11 @@ class Inotify
         $this->bind($wd, $path);
 
         if (is_dir($path)) {
+            $wd = inotify_add_watch($this->fd, $path, $this->watchMask);
+            if ($wd === false) {
+                return false;
+            }
+            $this->bind($wd, $path);
             $files = scandir($path);
             foreach ($files as $file) {
                 if ($file === '.' || $file === '..' || $this->isExcluded($file)) {
@@ -83,15 +91,6 @@ class Inotify
                 $file = $path . DIRECTORY_SEPARATOR . $file;
                 if (is_dir($file)) {
                     $this->_watch($file);
-                }
-
-                $fileType = strrchr($file, '.');
-                if (isset($this->fileTypes[$fileType])) {
-                    $wd = inotify_add_watch($this->fd, $file, $this->watchMask);
-                    if ($wd === false) {
-                        return false;
-                    }
-                    $this->bind($wd, $file);
                 }
             }
         }
@@ -123,7 +122,7 @@ class Inotify
 
     public function start()
     {
-        swoole_event_add($this->fd, function ($fp) {
+        Event::add($this->fd, function ($fp) {
             $events = inotify_read($fp);
             foreach ($events as $event) {
                 if ($event['mask'] == IN_IGNORED) {
@@ -139,7 +138,7 @@ class Inotify
                     continue;
                 }
 
-                swoole_timer_after(100, function () use ($event) {
+                Timer::after(100, function () use ($event) {
                     call_user_func_array($this->watchHandler, [$event]);
                     $this->doing = false;
                 });
@@ -147,12 +146,12 @@ class Inotify
                 break;
             }
         });
-        swoole_event_wait();
+        Event::wait();
     }
 
     public function stop()
     {
-        swoole_event_del($this->fd);
+        Event::del($this->fd);
         fclose($this->fd);
     }
 

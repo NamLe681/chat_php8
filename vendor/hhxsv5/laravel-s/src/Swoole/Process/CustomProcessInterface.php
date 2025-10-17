@@ -2,33 +2,33 @@
 
 namespace Hhxsv5\LaravelS\Swoole\Process;
 
+use Swoole\Http\Server;
+use Swoole\Process;
+
 interface CustomProcessInterface
 {
     /**
-     * The name of process
-     * @return string
-     */
-    public static function getName();
-
-    /**
      * The run callback of process
-     * @param \swoole_server $swoole
+     * @param Server $swoole
+     * @param Process $process
      * @return void
      */
-    public static function callback(\swoole_server $swoole);
+    public static function callback(Server $swoole, Process $process);
 
     /**
-     * Whether redirect stdin/stdout
-     * @return bool
+     * Trigger this method on receiving the signal SIGUSR1
+     * @param Server $swoole
+     * @param Process $process
+     * @return void
      */
-    public static function isRedirectStdinStdout();
+    public static function onReload(Server $swoole, Process $process);
 
     /**
-     * The type of pipeline
-     * 0: no pipeline
-     * 1: \SOCK_STREAM
-     * 2: \SOCK_DGRAM
-     * @return int
+     * Trigger this method on receiving the signal SIGTERM
+     * Commented out due to version compatibility
+     * @param Server $swoole
+     * @param Process $process
+     * @return void
      */
-    public static function getPipeType();
+    // public static function onStop(Server $swoole, Process $process);
 }
